@@ -1,19 +1,19 @@
 #include <QApplication>
 #include <QMainWindow>
 #include "corewindow.h"
-#include <sockettest.h>
+#include <socketcommunicator.h>
 
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
-    CoreWindow window;
+//    CoreWindow window;
 
-    window.setWindowTitle(QString::fromUtf8("MainWindow"));
-    window.resize(450,300);
-    window.decorate();
+//    window.setWindowTitle(QString::fromUtf8("MainWindow"));
+//    window.resize(450,300);
+//    window.decorate();
 
-    SocketTest cTest;
-    cTest.Connect();
+    SocketCommunicator cTest;
+    cTest.Test();
 
 
     return app.exec();

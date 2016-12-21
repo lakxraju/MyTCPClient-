@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QDebug>
+#include <QAbstractSocket>
 
 class SocketTest : public QObject
 {
@@ -11,11 +12,17 @@ class SocketTest : public QObject
 public:
     explicit SocketTest(QObject *parent = 0);
 
-    void Connect();
+    void Test();
+    qint32 ArrayToInt(QByteArray source);
 
 signals:
 
 public slots:
+
+//    void Connected();
+//    void Disconnected();
+//    void bytesWritten(qint64 bytes);
+//    void readyRead();
 
 private:
     QTcpSocket *socket;

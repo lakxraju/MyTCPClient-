@@ -7,8 +7,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 SOURCES += \
     main.cpp \
-    sockettest.cpp
+    sockettest.cpp \
+    socketcommunicator.cpp
 
 HEADERS += \
     corewindow.h \
-    sockettest.h
+    sockettest.h \
+    socketcommunicator.h
