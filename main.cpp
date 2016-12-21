@@ -13,7 +13,8 @@ int main(int argc, char *argv[])
 //    window.decorate();
 
     SocketCommunicator cTest;
-    cTest.Test();
+    //cTest.Test();
+    cTest.readAndProcessFromFile();
 
 
     return app.exec();

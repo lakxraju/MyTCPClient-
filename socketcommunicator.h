@@ -5,6 +5,7 @@
 #include <QTcpSocket>
 #include <QDebug>
 #include <QAbstractSocket>
+#include <QFile>
 
 class SocketCommunicator : public QObject
 {
@@ -14,6 +15,9 @@ public:
     QTcpSocket *m_pConnection;
     void ProcessMessage(QByteArray msg);
     void Test();
+    void readAndProcessFromFile();
+    int rawToInt(QByteArray arr);
+    short rawToShort(QByteArray arr);
 
 signals:
 
