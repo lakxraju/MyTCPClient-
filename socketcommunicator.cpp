@@ -1,6 +1,7 @@
 #include "socketcommunicator.h"
 #include <complex>
 #include <qfile.h>
+#include <QDataStream>
 
 
 
@@ -139,6 +140,12 @@ void SocketCommunicator::ProcessMessage(QByteArray buffer)
     qDebug() << "Computed Intensity:" << intensityArray;
 }
 
+
+/*
+ * Note: This method reads the raw data that is stored in local file and converts it into usable datatypes.
+ * Assumption: C:\\Users\\bots2rec\\Documents\\Data.per is the local file where the stream is stored
+ *
+ */
 void SocketCommunicator::readAndProcessFromFile()
 {
     QByteArray currentByteArray;
@@ -148,34 +155,73 @@ void SocketCommunicator::readAndProcessFromFile()
     tempFile.open(QIODevice::ReadOnly);
     currentByteArray = tempFile.readAll();
 
-    qint32 size;
+    quint32 size;
     QByteArray buffer;
     QByteArray completePacket;
-    qint32 angle;
-    qint32 Entries;
+    quint16 angle;
+    quint16 Entries;
     QByteArray distances;
     QByteArray realValues;
     QByteArray imaginaryValues;
     QByteArray currentPacket;
     bool ok = false;
 
+
     qDebug() << "Read the file and the size is : " << currentByteArray.size();
     while(currentByteArray.size() > 4)
     {
-        size = rawToInt(currentByteArray.mid(0,4));
 
-        qDebug() << "Size of current Packet: " << size;
+        /*
+         * Variant 1: QByteArray -> QDataStream -> Unsigned int
+         */
+        QByteArray tempByteArray = currentByteArray.mid(0,4);
+        QDataStream tempStreamForSize(&tempByteArray,QIODevice::ReadWrite);
+        tempStreamForSize.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForSize >> size;
+        qDebug() << "Size of current Packet(Via variant 1): " << size;
+
+
+        /*
+         * Variant 2: QByteArray -> Unsigned int Direct conversion
+         * (check rawToInt(QByteArray arry) method for details)
+         *
+         */
+
+        size = rawToInt(currentByteArray.mid(0,4));
+        qDebug() << "Size of current Packet(Via variant 2): " << size;
+
+
+        /*
+         * Variant 3: QByteArray -> int conversion given by the methods in QByteArray
+         */
+
+         size = currentByteArray.mid(0,4).toInt(&ok);
+         qDebug() << "Size of current Packet(Via variant 3): " << size;
+
+
+
+        //Again reallocating to variant 1
+        tempStreamForSize >> size;
+
+        //extracting current packet from the whole file byte array
+        currentPacket = currentByteArray.mid(0,size);
+
 
         //get angle of the entry
-
         qDebug() << "Angle Byte Array" << currentPacket.mid(12,2);
         qDebug() << "Entry Byte Array" << currentPacket.mid(14,2);
 
+        //Compute Angle Based on variant 1
+        QByteArray tempByteArrayForAngle = currentByteArray.mid(12,2);
+        QDataStream tempStreamForAngle(&tempByteArrayForAngle,QIODevice::ReadWrite);
+        tempStreamForAngle.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForAngle >> angle;
 
-
-        angle = rawToShort(currentPacket.mid(12,2));
-        Entries = rawToShort(currentPacket.mid(14,2));
-
+        //Compute number of Entries based on variant 1
+        QByteArray tempByteArrayForEntries = currentPacket.mid(14,2);
+        QDataStream tempStreamForEntries(&tempByteArrayForEntries,QIODevice::ReadWrite);
+        tempStreamForEntries.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForEntries >> Entries;
 
         qDebug() << "Angle:" << angle;
         qDebug() << "Entries:" << Entries;
@@ -211,21 +257,48 @@ void SocketCommunicator::readAndProcessFromFile()
         qDebug() << "Real:" << realValueArray;
         qDebug() << "Imaginary:" << imaginaryValueArray;
         qDebug() << "Computed Intensity:" << intensityArray;
-        currentPacket = currentByteArray.remove(0,size);
+
+
+        //removing the initial processed byte array
+        int temp1 = currentByteArray.size();
+        currentByteArray = currentByteArray.right(temp1 - size);
     }
     tempFile.close();
 }
 
+
+/*
+ * Note: This method converts raw data in a QByteArray into an integer.
+ * Assumption: Input array is of size 4
+ *
+ */
 int SocketCommunicator::rawToInt(QByteArray arry)
 {
     int i = (arry.at(3) << 24) | (arry.at(2) << 16) | (arry.at(1) << 8) | (arry.at(0));
     return i;
 }
 
+/*
+ * Note: This method converts raw data in a QByteArray into a short integer.
+ * Assumption: Input array is of size 2
+ *
+ */
 short SocketCommunicator::rawToShort(QByteArray arry)
 {
     short s = (arry[0] << 8) | (arry[1]);
     return s;
+}
+
+
+/*
+ * Note: This method converts a given QByteArray to a QDataStream.
+ * This is done in order to facilitate easy conversion of raw data to different datatypes.
+ */
+QDataStream SocketCommunicator::ByteArrayToDataStream(QByteArray arry)
+{
+//    QDataStream tempStream(&arry, QIODevice::ReadWrite);
+//    tempStream.setByteOrder(QDataStream::LittleEndian);
+//    return tempStream;
 }
 
 

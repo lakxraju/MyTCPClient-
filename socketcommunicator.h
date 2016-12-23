@@ -18,6 +18,7 @@ public:
     void readAndProcessFromFile();
     int rawToInt(QByteArray arr);
     short rawToShort(QByteArray arr);
+    QDataStream ByteArrayToDataStream(QByteArray arry);
 
 signals:
 
