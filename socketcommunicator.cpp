@@ -145,6 +145,20 @@ void SocketCommunicator::ProcessMessage(QByteArray buffer)
  * Note: This method reads the raw data that is stored in local file and converts it into usable datatypes.
  * Assumption: C:\\Users\\bots2rec\\Documents\\Data.per is the local file where the stream is stored
  *
+ *
+ * Algorithm:
+ *  1. Read all data from the local file "C:\\Users\\bots2rec\\Documents\\Data.per" into a QByteArray
+ *  2. In a loop continue the following computation (if the size of the ByteArray is greater than 4)
+ *      2a. Extract first 4 bytes of the array to know the size of first packet.
+ *      2b. Copy the first packet into another local variable
+ *      2c. Extract following information from the current packet:
+ *              1. Angle (bytes 12 - 14)
+ *              2. Number of Entries (bytes 14 - 16)
+ *              3. Based on Number of Entries (n), we extract bytes corresponding to distance array, real value and imaginary values (to compute intensity)
+ *              4. Compute intensity based on the real and imaginary values
+ *      2d. Remove the currentPacket bytes from the main QByteArray
+ *
+ *  Note: We currently are not storing the output in any file. We just print it.
  */
 void SocketCommunicator::readAndProcessFromFile()
 {
@@ -240,6 +254,7 @@ void SocketCommunicator::readAndProcessFromFile()
         bool ok = false;
         for(int i=0; i<Entries; i++)
         {
+            //Using the variant 3 conversion for experimentation
            DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
            realValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
            imaginaryValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
