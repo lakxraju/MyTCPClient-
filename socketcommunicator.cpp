@@ -162,18 +162,18 @@ void SocketCommunicator::ProcessMessage(QByteArray buffer)
  */
 void SocketCommunicator::readAndProcessFromFile()
 {
-    QByteArray currentByteArray;
+    QByteArray wholeByteArray;
 
     QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
     QFile tempFile(filename);
     tempFile.open(QIODevice::ReadOnly);
-    currentByteArray = tempFile.readAll();
+    wholeByteArray = tempFile.readAll();
 
-    quint32 size;
+    quint32 current_packet_size;
     QByteArray buffer;
     QByteArray completePacket;
     quint16 angle;
-    quint16 Entries;
+    quint16 Number_of_Entries;
     QByteArray distances;
     QByteArray realValues;
     QByteArray imaginaryValues;
@@ -181,18 +181,18 @@ void SocketCommunicator::readAndProcessFromFile()
     bool ok = false;
 
 
-    qDebug() << "Read the file and the size is : " << currentByteArray.size();
-    while(currentByteArray.size() > 4)
+    qDebug() << "Read the file and the size is : " << wholeByteArray.size();
+    while(wholeByteArray.size() > 4)
     {
 
         /*
          * Variant 1: QByteArray -> QDataStream -> Unsigned int
          */
-        QByteArray tempByteArray = currentByteArray.mid(0,4);
+        QByteArray tempByteArray = wholeByteArray.mid(0,4);
         QDataStream tempStreamForSize(&tempByteArray,QIODevice::ReadWrite);
         tempStreamForSize.setByteOrder(QDataStream::LittleEndian);
-        tempStreamForSize >> size;
-        qDebug() << "Size of current Packet(Via variant 1): " << size;
+        tempStreamForSize >> current_packet_size;
+        qDebug() << "Size of current Packet(Via variant 1): " << current_packet_size;
 
 
         /*
@@ -201,24 +201,24 @@ void SocketCommunicator::readAndProcessFromFile()
          *
          */
 
-        size = rawToInt(currentByteArray.mid(0,4));
-        qDebug() << "Size of current Packet(Via variant 2): " << size;
+        current_packet_size = rawToInt(wholeByteArray.mid(0,4));
+        qDebug() << "Size of current Packet(Via variant 2): " << current_packet_size;
 
 
         /*
          * Variant 3: QByteArray -> int conversion given by the methods in QByteArray
          */
 
-         size = currentByteArray.mid(0,4).toInt(&ok);
-         qDebug() << "Size of current Packet(Via variant 3): " << size;
+         current_packet_size = wholeByteArray.mid(0,4).toInt(&ok);
+         qDebug() << "Size of current Packet(Via variant 3): " << current_packet_size;
 
 
 
         //Again reallocating to variant 1
-        tempStreamForSize >> size;
+        tempStreamForSize >> current_packet_size;
 
         //extracting current packet from the whole file byte array
-        currentPacket = currentByteArray.mid(0,size);
+        currentPacket = wholeByteArray.mid(0,current_packet_size);
 
 
         //get angle of the entry
@@ -226,7 +226,7 @@ void SocketCommunicator::readAndProcessFromFile()
         qDebug() << "Entry Byte Array" << currentPacket.mid(14,2);
 
         //Compute Angle Based on variant 1
-        QByteArray tempByteArrayForAngle = currentByteArray.mid(12,2);
+        QByteArray tempByteArrayForAngle = currentPacket.mid(12,2);
         QDataStream tempStreamForAngle(&tempByteArrayForAngle,QIODevice::ReadWrite);
         tempStreamForAngle.setByteOrder(QDataStream::LittleEndian);
         tempStreamForAngle >> angle;
@@ -235,24 +235,24 @@ void SocketCommunicator::readAndProcessFromFile()
         QByteArray tempByteArrayForEntries = currentPacket.mid(14,2);
         QDataStream tempStreamForEntries(&tempByteArrayForEntries,QIODevice::ReadWrite);
         tempStreamForEntries.setByteOrder(QDataStream::LittleEndian);
-        tempStreamForEntries >> Entries;
+        tempStreamForEntries >> Number_of_Entries;
 
         qDebug() << "Angle:" << angle;
-        qDebug() << "Entries:" << Entries;
-        qint32 sizeOfAllEntries = 4*Entries;
-        qint32 seekPosition = 12 * Entries;
+        qDebug() << "Entries:" << Number_of_Entries;
+        qint32 sizeOfAllEntries = 4*Number_of_Entries;
+        qint32 seekPosition = 12 * Number_of_Entries;
 
-        float DistanceArray[Entries];
-        float realValueArray[Entries];
-        float imaginaryValueArray[Entries];
-        double intensityArray[Entries];
+        float DistanceArray[Number_of_Entries];
+        float realValueArray[Number_of_Entries];
+        float imaginaryValueArray[Number_of_Entries];
+        double intensityArray[Number_of_Entries];
 
         distances = currentPacket.mid(16+seekPosition,sizeOfAllEntries);
         realValues = currentPacket.mid(20+seekPosition,sizeOfAllEntries);
         imaginaryValues = currentPacket.mid(24+seekPosition,sizeOfAllEntries);
 
         bool ok = false;
-        for(int i=0; i<Entries; i++)
+        for(int i=0; i<Number_of_Entries; i++)
         {
             //Using the variant 3 conversion for experimentation
            DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
@@ -265,9 +265,9 @@ void SocketCommunicator::readAndProcessFromFile()
         }
 
         qDebug() << "Stream Processed!";
-        qDebug() << "size:" << size;
+        qDebug() << "size:" << current_packet_size;
         qDebug() << "Angle:" << angle;
-        qDebug() << "No. of Entries:" << Entries;
+        qDebug() << "No. of Entries:" << Number_of_Entries;
         qDebug() << "Distances:" << DistanceArray;
         qDebug() << "Real:" << realValueArray;
         qDebug() << "Imaginary:" << imaginaryValueArray;
@@ -275,8 +275,8 @@ void SocketCommunicator::readAndProcessFromFile()
 
 
         //removing the initial processed byte array
-        int temp1 = currentByteArray.size();
-        currentByteArray = currentByteArray.right(temp1 - size);
+        int whole_size = wholeByteArray.size();
+        wholeByteArray = wholeByteArray.right(whole_size - current_packet_size);
     }
     tempFile.close();
 }
