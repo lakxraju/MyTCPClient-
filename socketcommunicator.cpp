@@ -284,7 +284,7 @@ void SocketCommunicator::readAndProcessFromFile()
 
           // qDebug()<< "Distance / Real / Imag" << tempDistance << " / " << tempReal << " / " << tempImag ;
 
-           auto spectrum = std::complex<float>{currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok), currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok)};
+           auto spectrum = std::complex<float>{tempReal, tempImag};
            auto intensity = std::abs(spectrum);
            intensityArray[i] = intensity;
            index = index + 4;
