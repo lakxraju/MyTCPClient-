@@ -179,12 +179,16 @@ void SocketCommunicator::readAndProcessFromFile()
     QByteArray imaginaryValues;
     QByteArray currentPacket;
     bool ok = false;
+    quint16 current_packet_id;
+    quint16 current_crc_ccid;
+    quint32 current_measurement_id;
 
 
     qDebug() << "Read the file and the size is : " << wholeByteArray.size();
     while(wholeByteArray.size() > 4)
     {
 
+        qDebug() << "============================Start of the Loop==================================";
         /*
          * Variant 1: QByteArray -> QDataStream -> Unsigned int
          */
@@ -192,38 +196,30 @@ void SocketCommunicator::readAndProcessFromFile()
         QDataStream tempStreamForSize(&tempByteArray,QIODevice::ReadWrite);
         tempStreamForSize.setByteOrder(QDataStream::LittleEndian);
         tempStreamForSize >> current_packet_size;
-        qDebug() << "Size of current Packet(Via variant 1): " << current_packet_size;
-
 
         /*
-         * Variant 2: QByteArray -> Unsigned int Direct conversion
-         * (check rawToInt(QByteArray arry) method for details)
-         *
+         * Variant 1: QByteArray -> QDataStream -> Unsigned int
          */
+        QByteArray tempByteArrayForID = wholeByteArray.mid(4,2);
+        QDataStream tempStreamForID(&tempByteArrayForID,QIODevice::ReadWrite);
+        tempStreamForID.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForID >> current_packet_id;
 
-        current_packet_size = rawToInt(wholeByteArray.mid(0,4));
-        qDebug() << "Size of current Packet(Via variant 2): " << current_packet_size;
-
-
-        /*
-         * Variant 3: QByteArray -> int conversion given by the methods in QByteArray
-         */
-
-         current_packet_size = wholeByteArray.mid(0,4).toInt(&ok);
-         qDebug() << "Size of current Packet(Via variant 3): " << current_packet_size;
+        QByteArray tempByteArrayForCRC = wholeByteArray.mid(6,2);
+        QDataStream tempStreamForCRC(&tempByteArrayForCRC,QIODevice::ReadWrite);
+        tempStreamForCRC.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForCRC >> current_crc_ccid;
 
 
 
-        //Again reallocating to variant 1
-        tempStreamForSize >> current_packet_size;
+        QByteArray tempByteArrayForMeasInd = wholeByteArray.mid(8,4);
+        QDataStream tempStreamForMeasInd(&tempByteArrayForMeasInd,QIODevice::ReadWrite);
+        tempStreamForMeasInd.setByteOrder(QDataStream::LittleEndian);
+        tempStreamForMeasInd >> current_measurement_id;
 
         //extracting current packet from the whole file byte array
         currentPacket = wholeByteArray.mid(0,current_packet_size);
 
-
-        //get angle of the entry
-        qDebug() << "Angle Byte Array" << currentPacket.mid(12,2);
-        qDebug() << "Entry Byte Array" << currentPacket.mid(14,2);
 
         //Compute Angle Based on variant 1
         QByteArray tempByteArrayForAngle = currentPacket.mid(12,2);
@@ -242,36 +238,70 @@ void SocketCommunicator::readAndProcessFromFile()
         qint32 sizeOfAllEntries = 4*Number_of_Entries;
         qint32 seekPosition = 12 * Number_of_Entries;
 
-        float DistanceArray[Number_of_Entries];
-        float realValueArray[Number_of_Entries];
-        float imaginaryValueArray[Number_of_Entries];
+        quint32 DistanceArray[Number_of_Entries];
+        quint32 realValueArray[Number_of_Entries];
+        quint32 imaginaryValueArray[Number_of_Entries];
         double intensityArray[Number_of_Entries];
+
 
         distances = currentPacket.mid(16+seekPosition,sizeOfAllEntries);
         realValues = currentPacket.mid(20+seekPosition,sizeOfAllEntries);
         imaginaryValues = currentPacket.mid(24+seekPosition,sizeOfAllEntries);
 
+
         bool ok = false;
+        int index = 0;
         for(int i=0; i<Number_of_Entries; i++)
         {
             //Using the variant 3 conversion for experimentation
-           DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
-           realValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
-           imaginaryValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
+           //DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
+           //realValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
+           //imaginaryValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
+
+           quint32 tempDistance;
+           quint32 tempReal;
+           quint32 tempImag;
+
+           QByteArray tempByteArrayForDistance = distances.mid(index,4);
+           //qDebug() << tempByteArrayForDistance;
+           QDataStream tempStreamForDistance(&tempByteArrayForDistance,QIODevice::ReadWrite);
+           tempStreamForDistance.setByteOrder(QDataStream::LittleEndian);
+           tempStreamForDistance >> tempDistance;
+
+           QByteArray tempByteArrayForReal = realValues.mid(index,4);
+           QDataStream tempStreamForReal(&tempByteArrayForReal,QIODevice::ReadWrite);
+           tempStreamForReal.setByteOrder(QDataStream::LittleEndian);
+           tempStreamForReal >> tempReal;
+
+           QByteArray tempByteArrayForImag = imaginaryValues.mid(index,4);
+           QDataStream tempStreamForImag(&tempByteArrayForImag,QIODevice::ReadWrite);
+           tempStreamForImag.setByteOrder(QDataStream::LittleEndian);
+           tempStreamForImag >> tempImag;
+
+           DistanceArray[i] = tempDistance;
+           realValueArray[i] = tempReal;
+           imaginaryValueArray[i] = tempImag;
+
+          // qDebug()<< "Distance / Real / Imag" << tempDistance << " / " << tempReal << " / " << tempImag ;
 
            auto spectrum = std::complex<float>{currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok), currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok)};
            auto intensity = std::abs(spectrum);
            intensityArray[i] = intensity;
+           index = index + 4;
         }
-
         qDebug() << "Stream Processed!";
+        qDebug() << "Packet ID" << current_packet_id;
+        qDebug() << "CRC-CCITT" << current_crc_ccid;
+        qDebug() << "Measurement ID" << current_measurement_id;
         qDebug() << "size:" << current_packet_size;
         qDebug() << "Angle:" << angle;
         qDebug() << "No. of Entries:" << Number_of_Entries;
-        qDebug() << "Distances:" << DistanceArray;
+        qDebug() << "Distances:" << distances;
         qDebug() << "Real:" << realValueArray;
         qDebug() << "Imaginary:" << imaginaryValueArray;
         qDebug() << "Computed Intensity:" << intensityArray;
+
+        qDebug() << "============================End of the Loop==================================";
 
 
         //removing the initial processed byte array
