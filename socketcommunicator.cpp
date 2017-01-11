@@ -2,6 +2,7 @@
 #include <complex>
 #include <qfile.h>
 #include <QDataStream>
+#include <QJsonDocument>
 
 
 
@@ -114,9 +115,6 @@ void SocketCommunicator::ProcessMessage(QByteArray buffer)
     float imaginaryValueArray[Entries];
     double intensityArray[Entries];
 
-    distances = buffer.mid(12+seekPosition,sizeOfAllEntries);
-    realValues = buffer.mid(16+seekPosition,sizeOfAllEntries);
-    imaginaryValues = buffer.mid(20+seekPosition,sizeOfAllEntries);
 
     for(int i=0; i<Entries; i++)
     {
@@ -235,8 +233,6 @@ void SocketCommunicator::readAndProcessFromFile()
 
         qDebug() << "Angle:" << angle;
         qDebug() << "Entries:" << Number_of_Entries;
-        qint32 sizeOfAllEntries = 4*Number_of_Entries;
-        qint32 seekPosition = 12 * Number_of_Entries;
 
         quint32 DistanceArray[Number_of_Entries];
         quint32 realValueArray[Number_of_Entries];
@@ -244,14 +240,7 @@ void SocketCommunicator::readAndProcessFromFile()
         double intensityArray[Number_of_Entries];
 
 
-        distances = currentPacket.mid(16+seekPosition,sizeOfAllEntries);
-        realValues = currentPacket.mid(20+seekPosition,sizeOfAllEntries);
-        imaginaryValues = currentPacket.mid(24+seekPosition,sizeOfAllEntries);
-
-
-        bool ok = false;
-        int index = 0;
-        for(int i=0; i<Number_of_Entries; i++)
+        for(int i=1; i<=Number_of_Entries; i++)
         {
             //Using the variant 3 conversion for experimentation
            //DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
@@ -262,18 +251,18 @@ void SocketCommunicator::readAndProcessFromFile()
            quint32 tempReal;
            quint32 tempImag;
 
-           QByteArray tempByteArrayForDistance = distances.mid(index,4);
+           QByteArray tempByteArrayForDistance = currentPacket.mid(16+(12*i),4);
            //qDebug() << tempByteArrayForDistance;
            QDataStream tempStreamForDistance(&tempByteArrayForDistance,QIODevice::ReadWrite);
            tempStreamForDistance.setByteOrder(QDataStream::LittleEndian);
            tempStreamForDistance >> tempDistance;
 
-           QByteArray tempByteArrayForReal = realValues.mid(index,4);
+           QByteArray tempByteArrayForReal = currentPacket.mid(20+(12*i),4);
            QDataStream tempStreamForReal(&tempByteArrayForReal,QIODevice::ReadWrite);
            tempStreamForReal.setByteOrder(QDataStream::LittleEndian);
            tempStreamForReal >> tempReal;
 
-           QByteArray tempByteArrayForImag = imaginaryValues.mid(index,4);
+           QByteArray tempByteArrayForImag = currentPacket.mid(24+(12*i),4);
            QDataStream tempStreamForImag(&tempByteArrayForImag,QIODevice::ReadWrite);
            tempStreamForImag.setByteOrder(QDataStream::LittleEndian);
            tempStreamForImag >> tempImag;
@@ -282,12 +271,11 @@ void SocketCommunicator::readAndProcessFromFile()
            realValueArray[i] = tempReal;
            imaginaryValueArray[i] = tempImag;
 
-          // qDebug()<< "Distance / Real / Imag" << tempDistance << " / " << tempReal << " / " << tempImag ;
+           qDebug()<< "Distance / Real / Imag" << tempDistance << " / " << tempReal << " / " << tempImag ;
 
            auto spectrum = std::complex<float>{tempReal, tempImag};
            auto intensity = std::abs(spectrum);
            intensityArray[i] = intensity;
-           index = index + 4;
         }
         qDebug() << "Stream Processed!";
         qDebug() << "Packet ID" << current_packet_id;
@@ -296,7 +284,7 @@ void SocketCommunicator::readAndProcessFromFile()
         qDebug() << "size:" << current_packet_size;
         qDebug() << "Angle:" << angle;
         qDebug() << "No. of Entries:" << Number_of_Entries;
-        qDebug() << "Distances:" << distances;
+        qDebug() << "Distances:" << DistanceArray;
         qDebug() << "Real:" << realValueArray;
         qDebug() << "Imaginary:" << imaginaryValueArray;
         qDebug() << "Computed Intensity:" << intensityArray;
