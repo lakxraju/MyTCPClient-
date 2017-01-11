@@ -3,6 +3,8 @@
 #include <qfile.h>
 #include <QDataStream>
 #include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 
 
 
@@ -181,11 +183,14 @@ void SocketCommunicator::readAndProcessFromFile()
     quint16 current_crc_ccid;
     quint32 current_measurement_id;
 
+    QJsonArray jsonArrayOfAllValues;
+
 
     qDebug() << "Read the file and the size is : " << wholeByteArray.size();
+    int j=0;
     while(wholeByteArray.size() > 4)
     {
-
+        QJsonArray jsonArrayForThisAngle;
         qDebug() << "============================Start of the Loop==================================";
         /*
          * Variant 1: QByteArray -> QDataStream -> Unsigned int
@@ -239,17 +244,21 @@ void SocketCommunicator::readAndProcessFromFile()
         quint32 imaginaryValueArray[Number_of_Entries];
         double intensityArray[Number_of_Entries];
 
+        QStringList stringListforDistances;
+        QStringList stringListforIntensities;
 
-        for(int i=1; i<=Number_of_Entries; i++)
+
+        for(int i=0; i<Number_of_Entries; i++)
         {
             //Using the variant 3 conversion for experimentation
            //DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
            //realValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
            //imaginaryValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
 
-           quint32 tempDistance;
-           quint32 tempReal;
-           quint32 tempImag;
+           qint32 tempDistance;
+           uint32_t tempReal;
+           uint32_t tempImag;
+
 
            QByteArray tempByteArrayForDistance = currentPacket.mid(16+(12*i),4);
            //qDebug() << tempByteArrayForDistance;
@@ -267,15 +276,35 @@ void SocketCommunicator::readAndProcessFromFile()
            tempStreamForImag.setByteOrder(QDataStream::LittleEndian);
            tempStreamForImag >> tempImag;
 
+           long double unpackedReal = unpack754(tempReal, 32, 8);
+           long double unpackedImag = unpack754(tempImag,32,8);
+
            DistanceArray[i] = tempDistance;
-           realValueArray[i] = tempReal;
-           imaginaryValueArray[i] = tempImag;
+           realValueArray[i] = unpackedReal;
+           imaginaryValueArray[i] = unpackedImag;
 
-           qDebug()<< "Distance / Real / Imag" << tempDistance << " / " << tempReal << " / " << tempImag ;
+           QString tempStringForReal;
+           tempStringForReal.append(QString::number((double) unpackedReal, 'f'));
+           QString tempStringForImag;
+           tempStringForImag.append(QString::number((double) unpackedImag, 'f'));
 
-           auto spectrum = std::complex<float>{tempReal, tempImag};
+           QString tempStringForDistance;
+           tempStringForDistance = QString::number(tempDistance);
+           QString tempStringForIntensities;
+
+
+
+           auto spectrum = std::complex<float>{unpackedReal, unpackedImag};
            auto intensity = std::abs(spectrum);
            intensityArray[i] = intensity;
+           tempStringForIntensities.append(QString::number((double) intensity, 'f'));
+
+
+           stringListforDistances.insert(i,tempStringForDistance);
+           stringListforIntensities.insert(i,tempStringForIntensities);
+
+
+           //qDebug()<< "Distance / Real / Imag / Intensity" << tempDistance << "cm / " << tempStringForReal << " / " << tempStringForImag << " / " << intensity ;
         }
         qDebug() << "Stream Processed!";
         qDebug() << "Packet ID" << current_packet_id;
@@ -292,10 +321,28 @@ void SocketCommunicator::readAndProcessFromFile()
         qDebug() << "============================End of the Loop==================================";
 
 
+        jsonArrayForThisAngle.append(angle);
+        jsonArrayForThisAngle.append(Number_of_Entries);
+
+        for(int l=0; l < stringListforDistances.count(); ++l){
+            jsonArrayForThisAngle.append(stringListforDistances.at(l));
+        }
+        for(int m=0; m < stringListforIntensities.count(); ++m){
+            jsonArrayForThisAngle.append(stringListforIntensities.at(m));
+        }
+
+        jsonArrayOfAllValues.insert(j,jsonArrayForThisAngle);
+        jsonArrayForThisAngle.empty();
         //removing the initial processed byte array
         int whole_size = wholeByteArray.size();
         wholeByteArray = wholeByteArray.right(whole_size - current_packet_size);
+        j++;
     }
+
+    QJsonDocument finalJsonDocument(jsonArrayOfAllValues);
+    QFile finalJsonFile("C:\\Users\\bots2rec\\Documents\\radarValues.json");
+    finalJsonFile.open(QIODevice::WriteOnly);
+    finalJsonFile.write(finalJsonDocument.toJson());
     tempFile.close();
 }
 
@@ -334,4 +381,29 @@ QDataStream SocketCommunicator::ByteArrayToDataStream(QByteArray arry)
 //    return tempStream;
 }
 
+long double SocketCommunicator::unpack754(uint64_t i, unsigned bits, unsigned expbits)
+{
+    long double result;
+    long long shift;
+    unsigned bias;
+    unsigned significandbits = bits - expbits - 1; // -1 for sign bit
+
+    if (i == 0) return 0.0;
+
+    // pull the significand
+    result = (i&((1LL<<significandbits)-1)); // mask
+    result /= (1LL<<significandbits); // convert back to float
+    result += 1.0f; // add the one back on
+
+    // deal with the exponent
+    bias = (1<<(expbits-1)) - 1;
+    shift = ((i>>significandbits)&((1LL<<expbits)-1)) - bias;
+    while(shift > 0) { result *= 2.0; shift--; }
+    while(shift < 0) { result /= 2.0; shift++; }
+
+    // sign it
+    result *= (i>>(bits-1))&1? -1.0: 1.0;
+
+    return result;
+}
 

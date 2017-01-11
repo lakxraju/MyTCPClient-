@@ -19,6 +19,7 @@ public:
     int rawToInt(QByteArray arr);
     short rawToShort(QByteArray arr);
     QDataStream ByteArrayToDataStream(QByteArray arry);
+    long double unpack754(uint64_t i, unsigned bits, unsigned expbits);
 
 signals:
 
