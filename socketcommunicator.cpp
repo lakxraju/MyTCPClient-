@@ -17,36 +17,6 @@ SocketCommunicator::SocketCommunicator(QObject *parent) :
 
 void SocketCommunicator::readyRead()
 {
-    // m_pConnection is a QTcpSocket
-
-    /*while(m_pConnection->bytesAvailable())
-    {
-
-
-        QByteArray buffer;
-
-
-        int dataSize;
-        m_pConnection->read((char*)&dataSize, sizeof(quint32));
-        qDebug() << "Data Size:" << dataSize;
-
-        if(buffer.capacity() > dataSize)
-            buffer = m_pConnection->read(dataSize);
-        else
-            buffer = m_pConnection->read(buffer.capacity());
-        qDebug() << "Current Buffer Size: " << buffer.size();
-        while(buffer.size() < dataSize) // only part of the message has been received
-        {
-            m_pConnection->waitForReadyRead(); // alternatively, store the buffer and wait for the next readyRead()
-            qDebug() << "Reading next " << dataSize - buffer.size() << " bytes";
-            buffer.append(m_pConnection->read(dataSize - buffer.size())); // append the remaining bytes of the message
-        }
-
-        qDebug() << "\tMessage Received:" << buffer;
-
-        // Do something with the message
-        ProcessMessage(buffer);
-    }*/
 
     QByteArray currentByteArray;
 
@@ -130,7 +100,6 @@ void SocketCommunicator::ProcessMessage(QByteArray buffer)
     }
 
     qDebug() << "Stream Processed!";
-   // qDebug() << "size:" << completePacketSize;
     qDebug() << "Packet ID:" << packetID;
     qDebug() << "Angle:" << angle;
     qDebug() << "No. of Entries:" << Entries;
@@ -164,21 +133,17 @@ void SocketCommunicator::readAndProcessFromFile()
 {
     QByteArray wholeByteArray;
 
-    QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
+    // QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
+
+    QString filename = "/home/charaf_eddine/MyTCPClient-/Data.per";
     QFile tempFile(filename);
     tempFile.open(QIODevice::ReadOnly);
     wholeByteArray = tempFile.readAll();
 
     quint32 current_packet_size;
-    QByteArray buffer;
-    QByteArray completePacket;
     quint16 angle;
     quint16 Number_of_Entries;
-    QByteArray distances;
-    QByteArray realValues;
-    QByteArray imaginaryValues;
     QByteArray currentPacket;
-    bool ok = false;
     quint16 current_packet_id;
     quint16 current_crc_ccid;
     quint32 current_measurement_id;
@@ -250,10 +215,6 @@ void SocketCommunicator::readAndProcessFromFile()
 
         for(int i=0; i<Number_of_Entries; i++)
         {
-            //Using the variant 3 conversion for experimentation
-           //DistanceArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
-           //realValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
-           //imaginaryValueArray[i] = currentPacket.mid(16+seekPosition+(i*4),4).toFloat(&ok);
 
            qint32 tempDistance;
            uint32_t tempReal;
@@ -261,7 +222,6 @@ void SocketCommunicator::readAndProcessFromFile()
 
 
            QByteArray tempByteArrayForDistance = currentPacket.mid(16+(12*i),4);
-           //qDebug() << tempByteArrayForDistance;
            QDataStream tempStreamForDistance(&tempByteArrayForDistance,QIODevice::ReadWrite);
            tempStreamForDistance.setByteOrder(QDataStream::LittleEndian);
            tempStreamForDistance >> tempDistance;
@@ -302,9 +262,6 @@ void SocketCommunicator::readAndProcessFromFile()
 
            stringListforDistances.insert(i,tempStringForDistance);
            stringListforIntensities.insert(i,tempStringForIntensities);
-
-
-           //qDebug()<< "Distance / Real / Imag / Intensity" << tempDistance << "cm / " << tempStringForReal << " / " << tempStringForImag << " / " << intensity ;
         }
         qDebug() << "Stream Processed!";
         qDebug() << "Packet ID" << current_packet_id;
@@ -340,7 +297,9 @@ void SocketCommunicator::readAndProcessFromFile()
     }
 
     QJsonDocument finalJsonDocument(jsonArrayOfAllValues);
-    QFile finalJsonFile("C:\\Users\\bots2rec\\Documents\\radarValues.json");
+    // QFile finalJsonFile("C:\\Users\\bots2rec\\Documents\\radarValues.json");
+    QFile finalJsonFile("/home/charaf_eddine/MyTCPClient-/radarValues.json");
+
     finalJsonFile.open(QIODevice::WriteOnly);
     finalJsonFile.write(finalJsonDocument.toJson());
     tempFile.close();
