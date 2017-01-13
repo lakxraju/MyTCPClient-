@@ -20,7 +20,9 @@ void SocketCommunicator::readyRead()
 
     QByteArray currentByteArray;
 
-    QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
+    // QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
+
+    QString filename = "/home/charaf_eddine/MyTCPClient-/Data.per";
     QFile tempFile(filename);
     tempFile.open(QIODevice::WriteOnly | QIODevice::Append);
     while(m_pConnection->bytesAvailable())
@@ -53,61 +55,7 @@ void SocketCommunicator::Disconnected()
     qDebug() << "Disconnected from the remote socket";
 }
 
-void SocketCommunicator::ProcessMessage(QByteArray buffer)
-{
-    qDebug() << "Inside Process Message!";
 
-    qint32 completePacketSize;
-    QByteArray completePacket;
-    qint32 angle;
-    qint32 Entries;
-    QString packetID;
-    QByteArray distances;
-    QByteArray realValues;
-    QByteArray imaginaryValues;
-    bool ok = false;
-
-    //completePacketSize = buffer.mid(0,4).toInt(&ok);
-
-    packetID = QString(buffer.mid(0,2).toHex());
-
-    //get angle of the entry
-    angle = buffer.mid(8,2).toInt(&ok);
-
-    Entries = buffer.mid(10,2).toInt(&ok);
-
-
-    qDebug() << "Angle:" << angle;
-    qDebug() << "Entries:" << Entries;
-    qint32 sizeOfAllEntries = 4*Entries;
-    qint32 seekPosition = 12 * Entries;
-
-    float DistanceArray[Entries];
-    float realValueArray[Entries];
-    float imaginaryValueArray[Entries];
-    double intensityArray[Entries];
-
-
-    for(int i=0; i<Entries; i++)
-    {
-       DistanceArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
-       realValueArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
-       imaginaryValueArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
-
-       auto spectrum = std::complex<float>{buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok), buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok)};
-       auto intensity = std::abs(spectrum);
-       intensityArray[i] = intensity;
-    }
-
-    qDebug() << "Stream Processed!";
-    qDebug() << "Packet ID:" << packetID;
-    qDebug() << "Angle:" << angle;
-    qDebug() << "No. of Entries:" << Entries;
-    qDebug() << "Distances:" << DistanceArray;
-    qDebug() << "Real:" << realValueArray;
-    qDebug() << "Imaginary:" << imaginaryValueArray;
-    qDebug() << "Computed Intensity:" << intensityArray;
-}
 
 
 /*
@@ -305,6 +253,38 @@ void SocketCommunicator::readAndProcessFromFile()
     tempFile.close();
 }
 
+/*
+ * The following function unpack754(uint64_t i, unsigned bits, unsigned expbits) is used to unpack the float from the uint that was taken from the data stream.
+ * This method is implemented based on IEEE - 754 speification
+ */
+
+long double SocketCommunicator::unpack754(uint64_t i, unsigned bits, unsigned expbits)
+{
+    long double result;
+    long long shift;
+    unsigned bias;
+    unsigned significandbits = bits - expbits - 1; // -1 for sign bit
+
+    if (i == 0) return 0.0;
+
+    // pull the significand
+    result = (i&((1LL<<significandbits)-1)); // mask
+    result /= (1LL<<significandbits); // convert back to float
+    result += 1.0f; // add the one back on
+
+    // deal with the exponent
+    bias = (1<<(expbits-1)) - 1;
+    shift = ((i>>significandbits)&((1LL<<expbits)-1)) - bias;
+    while(shift > 0) { result *= 2.0; shift--; }
+    while(shift < 0) { result /= 2.0; shift++; }
+
+    // sign it
+    result *= (i>>(bits-1))&1? -1.0: 1.0;
+
+    return result;
+}
+
+// All following methods are not used currently. Having it just for reference purposes.
 
 /*
  * Note: This method converts raw data in a QByteArray into an integer.
@@ -340,29 +320,61 @@ QDataStream SocketCommunicator::ByteArrayToDataStream(QByteArray arry)
 //    return tempStream;
 }
 
-long double SocketCommunicator::unpack754(uint64_t i, unsigned bits, unsigned expbits)
+// This method was used to process the realtime buffer
+
+void SocketCommunicator::ProcessMessage(QByteArray buffer)
 {
-    long double result;
-    long long shift;
-    unsigned bias;
-    unsigned significandbits = bits - expbits - 1; // -1 for sign bit
+    qDebug() << "Inside Process Message!";
 
-    if (i == 0) return 0.0;
+    qint32 completePacketSize;
+    QByteArray completePacket;
+    qint32 angle;
+    qint32 Entries;
+    QString packetID;
+    QByteArray distances;
+    QByteArray realValues;
+    QByteArray imaginaryValues;
+    bool ok = false;
 
-    // pull the significand
-    result = (i&((1LL<<significandbits)-1)); // mask
-    result /= (1LL<<significandbits); // convert back to float
-    result += 1.0f; // add the one back on
+    //completePacketSize = buffer.mid(0,4).toInt(&ok);
 
-    // deal with the exponent
-    bias = (1<<(expbits-1)) - 1;
-    shift = ((i>>significandbits)&((1LL<<expbits)-1)) - bias;
-    while(shift > 0) { result *= 2.0; shift--; }
-    while(shift < 0) { result /= 2.0; shift++; }
+    packetID = QString(buffer.mid(0,2).toHex());
 
-    // sign it
-    result *= (i>>(bits-1))&1? -1.0: 1.0;
+    //get angle of the entry
+    angle = buffer.mid(8,2).toInt(&ok);
 
-    return result;
+    Entries = buffer.mid(10,2).toInt(&ok);
+
+
+    qDebug() << "Angle:" << angle;
+    qDebug() << "Entries:" << Entries;
+    qint32 sizeOfAllEntries = 4*Entries;
+    qint32 seekPosition = 12 * Entries;
+
+    float DistanceArray[Entries];
+    float realValueArray[Entries];
+    float imaginaryValueArray[Entries];
+    double intensityArray[Entries];
+
+
+    for(int i=0; i<Entries; i++)
+    {
+       DistanceArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
+       realValueArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
+       imaginaryValueArray[i] = buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok);
+
+       auto spectrum = std::complex<float>{buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok), buffer.mid(12+seekPosition+(i*4),4).toFloat(&ok)};
+       auto intensity = std::abs(spectrum);
+       intensityArray[i] = intensity;
+    }
+
+    qDebug() << "Stream Processed!";
+    qDebug() << "Packet ID:" << packetID;
+    qDebug() << "Angle:" << angle;
+    qDebug() << "No. of Entries:" << Entries;
+    qDebug() << "Distances:" << DistanceArray;
+    qDebug() << "Real:" << realValueArray;
+    qDebug() << "Imaginary:" << imaginaryValueArray;
+    qDebug() << "Computed Intensity:" << intensityArray;
 }
 
