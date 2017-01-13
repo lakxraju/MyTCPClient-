@@ -15,7 +15,7 @@ public:
     QTcpSocket *m_pConnection;
     void ProcessMessage(QByteArray msg);
     void Test();
-    void readAndProcessFromFile();
+    void readAndProcessFromFile(int selectedOption);
     int rawToInt(QByteArray arr);
     short rawToShort(QByteArray arr);
     QDataStream ByteArrayToDataStream(QByteArray arry);

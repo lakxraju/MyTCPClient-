@@ -13,4 +13,8 @@ SOURCES += \
 HEADERS += \
     corewindow.h \
     sockettest.h \
-    socketcommunicator.h
+    socketcommunicator.h \
+    maindialog.h
+
+FORMS += \
+    dialog.ui

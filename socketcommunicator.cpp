@@ -5,6 +5,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QDateTime>
 
 
 
@@ -22,7 +23,7 @@ void SocketCommunicator::readyRead()
 
     // QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
 
-    QString filename = "/home/charaf_eddine/MyTCPClient-/Data.per";
+    QString filename = "/home/charaf_eddine/MyTCPClient-/Raw_Radar_Data/Data.per";
     QFile tempFile(filename);
     tempFile.open(QIODevice::WriteOnly | QIODevice::Append);
     while(m_pConnection->bytesAvailable())
@@ -37,6 +38,7 @@ void SocketCommunicator::readyRead()
 void SocketCommunicator::Test()
 {
 
+    // "192.168.23.12" is always the same as the NUC has this static IP address
     m_pConnection->connectToHost("192.168.23.12", 10120);
 
 
@@ -77,13 +79,12 @@ void SocketCommunicator::Disconnected()
  *
  *  Note: We currently are not storing the output in any file. We just print it.
  */
-void SocketCommunicator::readAndProcessFromFile()
+void SocketCommunicator::readAndProcessFromFile(int selectedOption)
 {
     QByteArray wholeByteArray;
-
     // QString filename = "C:\\Users\\bots2rec\\Documents\\Data.per";
 
-    QString filename = "/home/charaf_eddine/MyTCPClient-/Data.per";
+    QString filename = "/home/charaf_eddine/MyTCPClient-/Raw_Radar_Data/Data.per";
     QFile tempFile(filename);
     tempFile.open(QIODevice::ReadOnly);
     wholeByteArray = tempFile.readAll();
@@ -103,6 +104,10 @@ void SocketCommunicator::readAndProcessFromFile()
     int j=0;
     while(wholeByteArray.size() > 4)
     {
+        // Following variables are for removing the duplicates
+        qint32 previousDistance = 0;
+        double highestIntensity = 0;
+
         QJsonArray jsonArrayForThisAngle;
         qDebug() << "============================Start of the Loop==================================";
         /*
@@ -164,7 +169,7 @@ void SocketCommunicator::readAndProcessFromFile()
         for(int i=0; i<Number_of_Entries; i++)
         {
 
-           qint32 tempDistance;
+           qint32 currentDistance;
            uint32_t tempReal;
            uint32_t tempImag;
 
@@ -172,7 +177,7 @@ void SocketCommunicator::readAndProcessFromFile()
            QByteArray tempByteArrayForDistance = currentPacket.mid(16+(12*i),4);
            QDataStream tempStreamForDistance(&tempByteArrayForDistance,QIODevice::ReadWrite);
            tempStreamForDistance.setByteOrder(QDataStream::LittleEndian);
-           tempStreamForDistance >> tempDistance;
+           tempStreamForDistance >> currentDistance;
 
            QByteArray tempByteArrayForReal = currentPacket.mid(20+(12*i),4);
            QDataStream tempStreamForReal(&tempByteArrayForReal,QIODevice::ReadWrite);
@@ -187,7 +192,7 @@ void SocketCommunicator::readAndProcessFromFile()
            long double unpackedReal = unpack754(tempReal, 32, 8);
            long double unpackedImag = unpack754(tempImag,32,8);
 
-           DistanceArray[i] = tempDistance;
+           DistanceArray[i] = currentDistance;
            realValueArray[i] = unpackedReal;
            imaginaryValueArray[i] = unpackedImag;
 
@@ -197,20 +202,64 @@ void SocketCommunicator::readAndProcessFromFile()
            tempStringForImag.append(QString::number((double) unpackedImag, 'f'));
 
            QString tempStringForDistance;
-           tempStringForDistance = QString::number(tempDistance);
+           tempStringForDistance = QString::number(currentDistance);
            QString tempStringForIntensities;
 
 
 
            auto spectrum = std::complex<float>{unpackedReal, unpackedImag};
-           auto intensity = std::abs(spectrum);
-           intensityArray[i] = intensity;
-           tempStringForIntensities.append(QString::number((double) intensity, 'f'));
+           auto currentIntensity = std::abs(spectrum);
+           intensityArray[i] = currentIntensity;
+           tempStringForIntensities.append(QString::number((double) currentIntensity, 'f'));
+
+           if((selectedOption == 2)&&(stringListforDistances.size()>0))
+           {
+             if(previousDistance == currentDistance)
+             {
+                if(highestIntensity < currentIntensity)
+                {
+                  highestIntensity = currentIntensity;
+                  stringListforDistances.removeLast();
+                  stringListforIntensities.removeLast();
+                  stringListforDistances.append(tempStringForDistance);
+                  stringListforIntensities.append(tempStringForIntensities);
+                }
+                else
+                {
+                  // Do nothing as the highest intensity for the current distance is already there.
+                }
+
+             }
+             else
+             {
+               stringListforDistances.append(tempStringForDistance);
+               stringListforIntensities.append(tempStringForIntensities);
+               highestIntensity = currentIntensity;
+             }
+           }
+           else if(stringListforDistances.size() == 0)
+           {
+             highestIntensity = currentIntensity;
+             stringListforDistances.append(tempStringForDistance);
+             stringListforIntensities.append(tempStringForIntensities);
+           }
+           else
+           {
+            stringListforDistances.append(tempStringForDistance);
+            stringListforIntensities.append(tempStringForIntensities);
+           }
 
 
-           stringListforDistances.insert(i,tempStringForDistance);
-           stringListforIntensities.insert(i,tempStringForIntensities);
+           previousDistance = currentDistance;
+
         }
+
+
+        if(selectedOption == 2)
+        {
+          Number_of_Entries = stringListforDistances.size();
+        }
+
         qDebug() << "Stream Processed!";
         qDebug() << "Packet ID" << current_packet_id;
         qDebug() << "CRC-CCITT" << current_crc_ccid;
@@ -224,7 +273,6 @@ void SocketCommunicator::readAndProcessFromFile()
         qDebug() << "Computed Intensity:" << intensityArray;
 
         qDebug() << "============================End of the Loop==================================";
-
 
         jsonArrayForThisAngle.append(angle);
         jsonArrayForThisAngle.append(Number_of_Entries);
@@ -246,7 +294,10 @@ void SocketCommunicator::readAndProcessFromFile()
 
     QJsonDocument finalJsonDocument(jsonArrayOfAllValues);
     // QFile finalJsonFile("C:\\Users\\bots2rec\\Documents\\radarValues.json");
-    QFile finalJsonFile("/home/charaf_eddine/MyTCPClient-/radarValues.json");
+
+    QDateTime datTime;
+    QString jsonFileName = "/home/charaf_eddine/MyTCPClient-/Preprocessed_Radar_Data/data_" + datTime.currentDateTime().toString() + ".json";
+    QFile finalJsonFile(jsonFileName);
 
     finalJsonFile.open(QIODevice::WriteOnly);
     finalJsonFile.write(finalJsonDocument.toJson());
