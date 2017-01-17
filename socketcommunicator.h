@@ -14,7 +14,7 @@ public:
     explicit SocketCommunicator(QObject *parent = 0);
     QTcpSocket *m_pConnection;
     void ProcessMessage(QByteArray msg);
-    void Test();
+    void captureRawRadarData(int selectedMode, int timeInSeconds);
     void readAndProcessFromFile(int selectedOption);
     int rawToInt(QByteArray arr);
     short rawToShort(QByteArray arr);

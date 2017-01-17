@@ -8,6 +8,8 @@
 #include <QDateTime>
 
 
+QTime dieTime;
+int mode;
 
 SocketCommunicator::SocketCommunicator(QObject *parent) :
     QObject(parent)
@@ -32,20 +34,32 @@ void SocketCommunicator::readyRead()
         qDebug() << "Current size of buffer: " << currentByteArray.size();
         tempFile.write(currentByteArray);
     }
+
+    if(dieTime <= QTime::currentTime())
+    {
+      disconnect(m_pConnection, SIGNAL(readyRead()), 0, 0);
+      m_pConnection->close();
+      tempFile.close();
+      readAndProcessFromFile(mode);
+    }
+
     tempFile.close();
 }
 
-void SocketCommunicator::Test()
+void SocketCommunicator::captureRawRadarData(int selectedMode, int timeInSeconds)
 {
 
     // "192.168.23.12" is always the same as the NUC has this static IP address
     m_pConnection->connectToHost("192.168.23.12", 10120);
 
+    dieTime = QTime::currentTime().addSecs(timeInSeconds);
+    mode = selectedMode;
 
     connect(m_pConnection,SIGNAL(connected()), this, SLOT(Connected()));
     connect(m_pConnection,SIGNAL(disconnected()),this, SLOT(Disconnected()));
     connect(m_pConnection,SIGNAL(readyRead()),this, SLOT(readyRead()));
 }
+
 
 void SocketCommunicator::Connected()
 {
@@ -153,6 +167,9 @@ void SocketCommunicator::readAndProcessFromFile(int selectedOption)
         QDataStream tempStreamForEntries(&tempByteArrayForEntries,QIODevice::ReadWrite);
         tempStreamForEntries.setByteOrder(QDataStream::LittleEndian);
         tempStreamForEntries >> Number_of_Entries;
+
+        if(angle > 1999)
+          break;
 
         qDebug() << "Angle:" << angle;
         qDebug() << "Entries:" << Number_of_Entries;

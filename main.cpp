@@ -1,46 +1,32 @@
-#include <QApplication>
+#include <QCoreApplication>
 #include <QMainWindow>
 #include "corewindow.h"
 #include <socketcommunicator.h>
 
 int main(int argc, char *argv[])
 {
-    QApplication app(argc, argv);
-
-    /*
-     * CoreWindow window;
-     * window.setWindowTitle(QString::fromUtf8("MainWindow"));
-     * window.resize(450,300);
-     * window.decorate();
-     *
-    */
-
+    QCoreApplication app(argc, argv);
     SocketCommunicator cTest;
+    int selectedMode = 2;
+    int timeInSeconds = 5;
+    //selectedMode = 1;
     /*
      * Note: The following line is to get raw data from the radar and store it in a local file C:\\Users\\bots2rec\\Documents\\Data.per.
      *       Uncomment if new data has to be fetched
+     *
+     *  Output file location: /home/charaf_eddine/MyTCPClient-/Raw_Radar_Data/
     */
 
-    //cTest.Test();
-
-
-
     /*
-     *  Note: The following line is to process the stored raw data from the local file. C:\\Users\\bots2rec\\Documents\\Data.per
-     */
-
-    int selectedMode = 1;
-
-    /*
-     * Uncomment the following line to get unique distance values with highest corresponding intensity
      *
      * selectedMode: 1 -> to get All values from radar
      *                 2 -> to get only the spiked values without duplicates
+     *  Output file location: /home/charaf_eddine/MyTCPClient-/Preprocessed_Radar_Data
+     *
+     * timeInSeconds: Duration to capture the RADAR data
      */
-     selectedMode = 2;
 
-    cTest.readAndProcessFromFile(selectedMode);
-
+    cTest.captureAndPreProcessRadarData(selectedMode, timeInSeconds);
 
     return app.exec();
 
